@@ -87,14 +87,14 @@ can break: a structured feed survives a visual redesign, while a brittle parser 
 
 ```mermaid
 flowchart TD
-  Q1{"Official or partner API available?"}
-  Q1 -->|yes| T1["Tier 1 · use the API · most robust"]
-  Q1 -->|no| Q2{"Data embedded in the initial page HTML?"}
-  Q2 -->|yes| T2["Tier 1 · parse embedded data · deterministic, no AI"]
-  Q2 -->|no| Q3{"Private JSON backend the site's own app calls?"}
-  Q3 -->|yes| T3["Tier 2 · call that JSON source"]
-  Q3 -->|no| Q4{"Strong anti-bot, or no clean source at all?"}
-  Q4 -->|yes| T4["Tier 3 / 4 · AI extraction or a library-based service"]
+  Q1{"Official or partner<br/>API available?"}
+  Q1 -->|yes| T1["Tier 1<br/>use the API<br/>most robust"]
+  Q1 -->|no| Q2{"Data embedded in<br/>the initial page HTML?"}
+  Q2 -->|yes| T2["Tier 1<br/>parse embedded data<br/>deterministic, no AI"]
+  Q2 -->|no| Q3{"Private JSON backend<br/>the site's own app calls?"}
+  Q3 -->|yes| T3["Tier 2<br/>call that JSON source"]
+  Q3 -->|no| Q4{"Strong anti-bot,<br/>or no clean source?"}
+  Q4 -->|yes| T4["Tier 3 / 4<br/>AI extraction or<br/>a library-based service"]
 ```
 
 ### Separate how you fetch from how you read
@@ -162,17 +162,17 @@ another.** Several patterns enforce that.
 
 ```mermaid
 flowchart TB
-  SCHED["Nightly schedule"] --> ORCH["Orchestrator · reads enabled sources"]
+  SCHED["Nightly schedule"] --> ORCH["Orchestrator<br/>reads enabled sources"]
   ORCH -->|continue on fail| W1["Source A worker"]
   ORCH -->|continue on fail| W2["Source B worker"]
   ORCH -->|continue on fail| W3["Source C worker"]
-  W1 --> STG[("Staging · upsert per page")]
+  W1 --> STG[("Staging<br/>upsert per page")]
   W2 --> STG
   W3 --> STG
-  STG -. decoupled .-> ENR["Enrichment · own schedule + lock"]
+  STG --> ENR["Enrichment<br/>own schedule + lock<br/>(decoupled)"]
   ENR -->|success| LIVE[("Live jobs feed")]
-  ENR -->|failure| RETRY["Count attempt · retry next run · cap 3"]
-  ENR --> HEALTH["Health snapshot + one-line digest alert"]
+  ENR -->|failure| RETRY["Count attempt<br/>retry next run<br/>cap at 3 tries"]
+  ENR --> HEALTH["Health snapshot<br/>one-line digest alert"]
 ```
 
 ### Polite by default
@@ -221,10 +221,10 @@ The collapse runs in three layers, each a safety net for the one before:
 
 ```mermaid
 flowchart LR
-  RAW["Raw title · 'Snr Angular .NET Full Stack Dev'"] --> L1["Layer 1 · AI picks the closest canonical role"]
-  L1 --> L2["Layer 2 · deterministic keyword rules, most-specific-first"]
-  L2 --> L3["Layer 3 · backfill repairs legacy rows, no AI cost"]
-  L3 --> OUT["One canonical role, or a small 'Other'"]
+  RAW["Raw title<br/>'Snr Angular .NET<br/>Full Stack Dev'"] --> L1["Layer 1<br/>AI picks the closest<br/>canonical role"]
+  L1 --> L2["Layer 2<br/>deterministic keyword rules<br/>most-specific-first"]
+  L2 --> L3["Layer 3<br/>backfill repairs<br/>legacy rows, no AI cost"]
+  L3 --> OUT["One canonical role<br/>or a small 'Other'"]
 ```
 
 Why three layers? The AI is good at semantics but not reliable enough to trust alone. The
