@@ -77,6 +77,8 @@ swappable behind a clear boundary.
 
 ### Prefer a site's own structured data; use AI only for the mess
 
+I have been really inspired by what the Team at [Parse bot](https://parse.bot/) has been doing. But I did not want to pay for yet another subscription, so I tried to reverse engineer their approach to unlocking the data on the internet. 
+
 The most robust way to read a site is the way the site reads itself. So for every source I
 look for structured data before reaching for a scraper. Only genuinely messy HTML gets the
 AI-extraction treatment, validated against a fixed schema.
