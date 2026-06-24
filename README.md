@@ -13,6 +13,8 @@ I weighed. Diagrams carry the structure; prose explains the *why*.
 
 ---
 
+![Get a Job in Tech Demo](./demo.gif)
+
 ## The problem: scraping that quietly rots
 
 Job boards change their markup, block datacentre traffic, and rate-limit aggressively. My
