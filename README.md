@@ -275,13 +275,8 @@ flowchart LR
 This matters beyond just keeping the README current. It encodes a value: documentation is
 part of the work, not a trailing task. The guard makes that impossible to defer.
 
-
 ---
 
 *Owner: Jess Klette · Last reviewed: 2026-06-24 · Review cadence: when the architecture
 changes materially. This is a public case study; the internal build docs live separately.*
 
----
-
-*Owner: Jess Klette · Last reviewed: 2026-06-24 · Review cadence: when the architecture
-changes materially. This is a public case study; the internal build docs live separately.*
