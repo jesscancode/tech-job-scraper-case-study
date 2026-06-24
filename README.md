@@ -19,7 +19,7 @@ I weighed. Diagrams carry the structure; prose explains the *why*.
 
 Job boards change their markup, block datacentre traffic, and rate-limit aggressively. My
 first version was a single Python job on a scheduler. It worked until it didn't, and the
-failures were the expensive kind: silent and total.
+failures were the expensive kind: silent and total. Let's just say the source websites did not like this approach at all 💅
 
 Three failure modes drove the rebuild:
 
@@ -248,7 +248,7 @@ The diagram above is the concept. Here's what it looks like when it runs:
 
 The boxes are n8n nodes. The paths show data flow and decision branches ✦ the fork where non-tech roles skip the AI call, the retry path when OpenAI fails, the loop that processes a batch before releasing the lock. The grey captions under each node show (where visible) the actual operation: HTTP calls, database queries, code execution.
 
-This is the real system running every night. The abstract three-layer model above is the *concept*; this is the *proof*.
+This is the real system running every night. The abstract three-layer model above is the *concept*; this is the *proof* that it actually works. Yay!
 
 ---
 
