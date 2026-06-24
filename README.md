@@ -13,7 +13,7 @@ I weighed. Diagrams carry the structure; prose explains the *why*.
 
 ---
 
-![Get a Job in Tech Demo](./demo.gif)
+![Get a Job in Tech Demo](./images/demo.gif)
 
 ## The problem: scraping that quietly rots
 
@@ -238,6 +238,16 @@ The hard-won lesson: a free-text role field let *"Other"* become the single larg
 category on the board, which polluted the trend pages. Forcing every title through a fixed
 list fixed that at the root.
 
+### The enrichment workflow in production
+
+The diagram above is the concept. Here's what it looks like when it runs:
+
+![The enrichment workflow running in n8n. Shows the orchestration path: acquire lock, denylist check, select unenriched jobs, loop through them, branch on non-tech roles, call OpenAI for semantic enrichment, deterministically normalise the role, check again, upsert to the live feed, mark done, release the lock, emit health snapshot, and post a digest alert.](./images/enrichment-workflow.png)
+
+The boxes are n8n nodes. The paths show data flow and decision branches ✦ the fork where non-tech roles skip the AI call, the retry path when OpenAI fails, the loop that processes a batch before releasing the lock. The grey captions under each node show (where visible) the actual operation: HTTP calls, database queries, code execution.
+
+This is the real system running every night. The abstract three-layer model above is the *concept*; this is the *proof*.
+
 ---
 
 ## What's next and current scope
@@ -249,9 +259,11 @@ Honest current state and near-term direction:
 - **deferred:** the high-risk professional network, pending a safer acquisition path
 - **next:** richer salary normalisation and a backfill mode for deep historical coverage
 
+---
+
 ## Keeping the docs honest
 
-One small workflow detail I'm proud of, because it reflects how I work. The most common documentation failure isn't bad writing ✦ it's drift. Code changes, the
+The most common documentation failure isn't bad writing ✦ it's drift. Code changes, the
 docs don't, and six months later the README describes a system that no longer exists.
 
 I built a forcing function into the development workflow itself. An automated guard runs
@@ -274,6 +286,23 @@ flowchart LR
 
 This matters beyond just keeping the README current. It encodes a value: documentation is
 part of the work, not a trailing task. The guard makes that impossible to defer.
+
+---
+
+---
+
+## Flag for my review
+
+Decisions I made where you may want a different call:
+
+- **naming n8n:** I kept the workflow engine named, since it's generic and exposes no attack
+  surface. Swap to "a workflow engine" if you'd rather name nothing.
+- **"several South African tech boards":** the public site already implies the niche, so I
+  judged this safe. Tighten to "several job boards" if you prefer.
+- **approximate numbers (~30 schema fields, ~two dozen roles, 0.3% coverage, cap of 3):**
+  included as concrete signal. Remove any you consider too revealing.
+- **mentioning the AI/proxy/service layers exist:** described only by role, never by vendor.
+  Confirm that's the right level of abstraction.
 
 ---
 
