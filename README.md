@@ -249,12 +249,37 @@ Honest current state and near-term direction:
 - **deferred:** the high-risk professional network, pending a safer acquisition path
 - **next:** richer salary normalisation and a backfill mode for deep historical coverage
 
-### How I keep the docs honest
+## Keeping the docs honest
 
-One small workflow detail I'm proud of, because it reflects how I work: an automated guard
-blocks a coding session from ending if pipeline behaviour changed but the docs didn't. It's
-a forcing function against the most common documentation failure ✦ drift between what the
-system does and what the docs claim.
+One small workflow detail I'm proud of, because it reflects how I work. The most common documentation failure isn't bad writing ✦ it's drift. Code changes, the
+docs don't, and six months later the README describes a system that no longer exists.
+
+I built a forcing function into the development workflow itself. An automated guard runs
+every time a coding session ends. It diffs what changed: if any pipeline code was touched
+but no documentation was updated, the session is blocked from closing until the docs catch
+up. You can't ship the change and promise yourself you'll document it later.
+
+> **Diagram ✦ the doc-guard loop.** A session that changes pipeline behaviour must also
+> update the docs before it can close. The guard runs automatically ✦ it's not a checklist,
+> it's a gate.
+
+```mermaid
+flowchart LR
+  EDIT["Pipeline code changes<br/>workflows · schema<br/>config · database"] --> STOP{"Doc guard<br/>runs on session end"}
+  STOP -->|docs not updated| BLOCK["Session blocked<br/>update the docs first"]
+  BLOCK --> UPD["Docs updated<br/>diagrams refreshed"]
+  UPD --> STOP
+  STOP -->|docs in sync| OK["Session closes cleanly"]
+```
+
+This matters beyond just keeping the README current. It encodes a value: documentation is
+part of the work, not a trailing task. The guard makes that impossible to defer.
+
+
+---
+
+*Owner: Jess Klette · Last reviewed: 2026-06-24 · Review cadence: when the architecture
+changes materially. This is a public case study; the internal build docs live separately.*
 
 ---
 
