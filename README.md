@@ -256,20 +256,5 @@ system does and what the docs claim.
 
 ---
 
-## Flag for my review
-
-Decisions I made where you may want a different call:
-
-- **naming n8n:** I kept the workflow engine named, since it's generic and exposes no attack
-  surface. Swap to "a workflow engine" if you'd rather name nothing.
-- **"several South African tech boards":** the public site already implies the niche, so I
-  judged this safe. Tighten to "several job boards" if you prefer.
-- **approximate numbers (~30 schema fields, ~two dozen roles, 0.3% coverage, cap of 3):**
-  included as concrete signal. Remove any you consider too revealing.
-- **mentioning the AI/proxy/service layers exist:** described only by role, never by vendor.
-  Confirm that's the right level of abstraction.
-
----
-
 *Owner: Jess Klette · Last reviewed: 2026-06-24 · Review cadence: when the architecture
 changes materially. This is a public case study; the internal build docs live separately.*
