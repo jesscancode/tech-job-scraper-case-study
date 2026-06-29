@@ -4,9 +4,9 @@ This is the data pipeline behind [getajobintech.co.za](https://getajobintech.co.
 South African tech job board. It collects listings from several job boards every night,
 cleans and tags them with AI, and publishes one deduplicated feed the website can trust.
 
-I'm writing this for fellow engineers and hiring managers, not as a setup guide. It
+I'm writing this for fellow engineers, scraping nerds and hiring managers, not as a setup guide. It
 explains the problem, the shape of the system, the decisions I made, and the trade-offs
-I weighed. Diagrams carry the structure; prose explains the *why*.
+I weighed. 
 
 > **Scope note.** This document deliberately abstracts the specific sources, vendors, and
 > endpoints. It's a design write-up, not a runbook ✦ the goal is to show the thinking.
@@ -18,8 +18,7 @@ I weighed. Diagrams carry the structure; prose explains the *why*.
 ## The problem: scraping that quietly rots
 
 Job boards change their markup, block datacentre traffic, and rate-limit aggressively. My
-first version was a single Python job on a scheduler. It worked until it didn't, and the
-failures were the expensive kind: silent and total. Let's just say the source websites did not like this approach at all 💅
+first version was a single Python job on a scheduler. Let's just say the source websites did not like this approach at all 💅
 
 Three failure modes drove the rebuild:
 
@@ -50,7 +49,7 @@ clean feed. Each stage is decoupled so a problem in one never cascades into the 
 ```mermaid
 flowchart LR
   subgraph SRC["Job sources · several SA tech boards"]
-    S1["Official partner API"]
+    S1["Official partner APIs"]
     S2["Board with data embedded in the page"]
     S3["Board with a private JSON backend"]
     S4["Board behind strong anti-bot"]
@@ -79,7 +78,7 @@ swappable behind a clear boundary.
 
 I have been really inspired by what the Team at [Parse bot](https://parse.bot/) has been doing. But I did not want to pay for yet another subscription, so I tried to reverse engineer their approach to unlocking the data on the internet. 
 
-The most robust way to read a site is the way the site reads itself. So for every source I
+The most robust way to **read a site is the way the site reads itself.** So for every source I
 look for structured data before reaching for a scraper. Only genuinely messy HTML gets the
 AI-extraction treatment, validated against a fixed schema.
 
@@ -87,7 +86,7 @@ This ordering is the single most important design choice. It minimises the surfa
 can break: a structured feed survives a visual redesign, while a brittle parser does not.
 
 > **Diagram ✦ choosing an acquisition method.** Work down the tiers and stop at the first
-> one a source supports. The higher the tier, the more robust and the cheaper to maintain.
+> one a source supports. The higher the tier, the more intense it is to build and the more expensive it is to maintain.
 
 ```mermaid
 flowchart TD
@@ -188,10 +187,10 @@ into a ban.
 
 ### An observability snapshot, not just logs
 
-A silently broken source used to look identical to a quiet night. Now every enrichment run
+`A silently broken source used to look identical to a quiet night. Now every enrichment run
 writes one health record ✦ rows processed, backlog size, sources succeeded versus failed ✦
 and posts a one-line digest to a chat channel. A green run and a degraded run are now
-visibly different.
+visibly different.`
 
 ### Decided against (the roads not taken)
 
@@ -231,10 +230,12 @@ flowchart LR
   L3 --> OUT["One canonical role<br/>or a small 'Other'"]
 ```
 
-Why three layers? The AI is good at semantics but not reliable enough to trust alone. The
-deterministic rules are the source of truth for new rows and catch the AI's mistakes ✦
+### Why three layers?
+
+The LLM is good at semantics but not reliable enough to trust alone. The
+deterministic rules are the source of truth for new rows and catch the LLM's mistakes ✦
 testing the most specific patterns first so a full-stack role never gets filed as frontend.
-The backfill repairs historical rows for free, with no AI calls.
+The backfill repairs historical rows for free, with no additional LLM calls.
 
 The hard-won lesson: a free-text role field let *"Other"* become the single largest
 category on the board, which polluted the trend pages. Forcing every title through a fixed
@@ -263,15 +264,14 @@ Honest current state and near-term direction:
 
 ---
 
-## Keeping the docs honest
+## Keeping the docs up to date automatically
 
-The most common documentation failure isn't bad writing ✦ it's drift. Code changes, the
-docs don't, and six months later the README describes a system that no longer exists.
+Keeping your daily testing, learning, and docs up to date is extremely important with the fragility of scrapers. 
 
 I built a forcing function into the development workflow itself. An automated guard runs
 every time a coding session ends. It diffs what changed: if any pipeline code was touched
 but no documentation was updated, the session is blocked from closing until the docs catch
-up. You can't ship the change and promise yourself you'll document it later.
+up. You can't ship the change and promise yourself you'll document it later. 
 
 > **Diagram ✦ the doc-guard loop.** A session that changes pipeline behaviour must also
 > update the docs before it can close. The guard runs automatically ✦ it's not a checklist,
