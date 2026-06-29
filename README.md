@@ -251,6 +251,31 @@ The boxes are n8n nodes. The paths show data flow and decision branches ✦ the 
 
 This is the real system running every night. The abstract three-layer model above is the *concept*; this is the *proof* that it actually works. Yay!
 
+### Beyond roles: the rest of the enrichment surface
+
+Role normalisation is the headline, but the enrichment step handles several other
+cleanup jobs that share the same philosophy ✦ deterministic rules where possible, AI only
+where the text is genuinely ambiguous:
+
+- **a non-tech gate** after the AI call filters out listings that slipped past the source
+  queries ✦ *"Girl Friday / Admin"*, *"Bridge Engineer"*, *"Tax Specialist"*. The AI flags
+  each row as tech or non-tech; a second deterministic check catches cases the AI missed
+  (role is *Other* and no recognisable tech skill in the skills list). Rejected rows stay
+  in staging and never reach the live feed
+- **job-level canonicalisation** collapses the zoo of seniority labels ✦ *"Mid-Level"*,
+  *"Intermediate"*, *"Other"*, the literal string *"null"* ✦ onto four buckets: junior,
+  mid, senior, lead. The mapping is kept byte-for-byte identical to a database trigger on
+  the board side, so neither system can drift independently
+- **skill casing** deduplicates and canonicalises the top ~120 skill strings
+  (*"reactjs"* → *"React"*, *"node.js"* → *"Node.js"*, *"ms sql"* → *"SQL Server"*) so
+  the board's skill facets don't show the same technology under three spellings
+- **city normalisation** rewrites remote-job location noise ✦ province codes, country
+  names, *"South Africa"* ✦ into a single *"Remote"* token so the location filter works
+  cleanly
+- **a taxonomy review label** (`other_role`) captures the AI's free-text role suggestion
+  whenever the deterministic rules land on *Other*, giving me a review queue to spot
+  emerging roles that deserve their own bucket
+
 ---
 
 ## What's next and current scope
@@ -291,6 +316,5 @@ part of the work, not a trailing task. The guard makes that impossible to defer.
 
 ---
 
-*Owner: Jess Klette · Last reviewed: 2026-06-24 · Review cadence: when the architecture
+*Owner: Jess Klette · Last reviewed: 2026-06-29 · Review cadence: when the architecture
 changes materially. This is a public case study; the internal build docs live separately.*
-
