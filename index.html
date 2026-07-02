@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Job aggregation pipeline — a case study</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Newsreader:ital@0;1&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; font-size: 13px; color: #2C2C2A; background: #fff; padding: 28px; max-width: 1000px; margin: 0 auto; line-height: 1.5; }
+  .hero { text-align: center; margin-bottom: 22px; padding-bottom: 20px; border-bottom: 1px solid #E4E2DB; }
+  .hero h1 { font-size: 24px; font-weight: 500; color: #2C2C2A; }
+  .hero .sub { font-size: 13px; color: #888780; margin-top: 6px; max-width: 640px; margin-left: auto; margin-right: auto; }
+  .hero .sub a { color: #185FA5; }
+  .color-legend { display: flex; flex-wrap: wrap; gap: 14px; justify-content: center; margin-top: 14px; font-size: 11px; color: #5F5E5A; }
+  .color-legend .ci { display: flex; align-items: center; gap: 6px; }
+  .swatch { width: 12px; height: 12px; border-radius: 3px; border: 1px solid; }
+  .section-label { font-size: 11px; font-weight: 500; color: #888780; text-transform: uppercase; letter-spacing: 0.5px; margin: 26px 0 4px; }
+  .section-title { font-size: 18px; font-weight: 500; color: #2C2C2A; margin: 0 0 10px; }
+  .lede { font-size: 14px; color: #444441; line-height: 1.65; max-width: 780px; margin-bottom: 12px; }
+  .lede.small { font-size: 13px; color: #5F5E5A; }
+  .lede a { color: #185FA5; }
+  .quote { font-family: 'Newsreader', Georgia, serif; font-size: 17px; font-style: italic; color: #2C2C2A; line-height: 1.5; border-left: 3px solid #84c65a; padding: 6px 0 6px 16px; margin: 14px 0; }
+  .quote .attr { display: block; font-family: 'Inter', sans-serif; font-style: normal; font-size: 12px; color: #888780; margin-top: 8px; }
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 12px 0; }
+  .info-card { border: 1px solid #E4E2DB; border-radius: 10px; padding: 12px 14px; }
+  .info-card.debt { border-left: 3px solid #B4B2A9; }
+  .info-card h4 { font-size: 13px; font-weight: 500; color: #2C2C2A; margin-bottom: 4px; }
+  .info-card p { font-size: 12px; color: #5F5E5A; line-height: 1.5; }
+  .info-card .tagline { font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.4px; color: #888780; margin-bottom: 5px; }
+  .loop-head { font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; padding: 5px 11px; border-radius: 6px; display: inline-block; margin: 4px 0 10px; }
+  .loop-head.green { background: #EAF3DE; color: #27500A; border: 1px solid #97C459; }
+  .loop-head.blue { background: #E6F1FB; color: #0C447C; border: 1px solid #85B7EB; }
+  .loop-head.dark { background: #111111; color: #fff; }
+  .loop-head.coral { background: #FAECE7; color: #712B13; border: 1px solid #F0997B; }
+  .flow-h { display: flex; align-items: stretch; flex-wrap: wrap; gap: 8px; }
+  .fbox { border-radius: 10px; padding: 10px 12px; text-align: center; flex: 1; min-width: 118px; border: 1px solid; }
+  .fbox .fstep { font-weight: 500; font-size: 14px; }
+  .fbox .fagent { font-size: 11px; margin-top: 3px; }
+  .fbox.green { background: #EAF3DE; border-color: #84c65a; } .fbox.green .fstep { color: #27500A; } .fbox.green .fagent { color: #3B6D11; }
+  .fbox.blue { background: #E6F1FB; border-color: #0d76eb; } .fbox.blue .fstep { color: #0C447C; } .fbox.blue .fagent { color: #185FA5; }
+  .fbox.dark { background: #111111; border-color: #111111; } .fbox.dark .fstep { color: #fff; } .fbox.dark .fagent { color: #B4B2A9; }
+  .fbox.coral { background: #FAECE7; border-color: #F0997B; } .fbox.coral .fstep { color: #712B13; } .fbox.coral .fagent { color: #993C1D; }
+  .fbox.tan { background: #F1EFE8; border-color: #B4B2A9; } .fbox.tan .fstep { color: #2C2C2A; } .fbox.tan .fagent { color: #5F5E5A; }
+  .fbox.dash { border-style: dashed; }
+  .arrow-r { align-self: center; color: #B4B2A9; font-size: 16px; flex: none; }
+  .return-note { font-size: 12px; margin-top: 8px; font-style: italic; display: flex; align-items: center; gap: 6px; }
+  .return-note.green { color: #3B6D11; } .return-note.blue { color: #185FA5; } .return-note.coral { color: #993C1D; }
+  .hub-band { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+  .conductor-bar { border-radius: 10px; padding: 11px 14px; background: #F1EFE8; border: 1px solid #B4B2A9; margin-top: 12px; }
+  .conductor-bar .cb-title { font-size: 14px; font-weight: 500; color: #2C2C2A; }
+  .conductor-bar .cb-sub { font-size: 12px; color: #5F5E5A; margin-top: 2px; }
+  .type-strip { display: flex; flex-wrap: wrap; gap: 16px; background: #fff; border: 1px solid #D3D1C7; border-radius: 8px; padding: 9px 14px; margin: 12px 0; font-size: 11px; color: #5F5E5A; align-items: center; }
+  .type-strip .ti { display: flex; align-items: center; gap: 6px; }
+  .type-dot { width: 11px; height: 11px; border-radius: 3px; border: 1px solid; }
+  .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; margin: 12px 0; }
+  .detail-card { border: 1px solid #E4E2DB; border-radius: 8px; padding: 10px 12px; }
+  .detail-card.green { border-left: 3px solid #84c65a; }
+  .detail-card.blue { border-left: 3px solid #0d76eb; }
+  .detail-card.dark { border-left: 3px solid #111111; }
+  .detail-card.coral { border-left: 3px solid #F0997B; }
+  .detail-card.tan { border-left: 3px solid #B4B2A9; }
+  .dc-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 4px; }
+  .dc-step { font-size: 14px; font-weight: 500; color: #2C2C2A; }
+  .dc-agent { font-size: 10px; font-weight: 500; border-radius: 20px; padding: 1px 8px; border: 1px solid; white-space: nowrap; }
+  .dc-agent.green { background: #EAF3DE; color: #27500A; border-color: #97C459; }
+  .dc-agent.blue { background: #E6F1FB; color: #0C447C; border-color: #85B7EB; }
+  .dc-agent.dark { background: #111111; color: #fff; border-color: #111111; }
+  .dc-agent.coral { background: #FAECE7; color: #712B13; border-color: #F0997B; }
+  .dc-agent.tan { background: #F1EFE8; color: #5F5E5A; border-color: #B4B2A9; }
+  .dc-body { font-size: 12px; color: #5F5E5A; line-height: 1.5; }
+  .prop-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin: 12px 0; }
+  .prop-card { border: 1px solid #E4E2DB; border-radius: 8px; padding: 10px 12px; background: #FAFAF7; }
+  .prop-card h4 { font-size: 13px; font-weight: 500; color: #2C2C2A; margin-bottom: 3px; }
+  .prop-card p { font-size: 12px; color: #5F5E5A; line-height: 1.45; }
+  .principle-list { margin: 10px 0 0; padding-left: 18px; font-size: 13px; color: #444441; line-height: 1.7; }
+  .principle-list b { font-weight: 500; color: #2C2C2A; }
+  .callout { background: #F1EFE8; border: 1px solid #B4B2A9; border-radius: 8px; padding: 12px 16px; margin: 14px 0; font-size: 13px; line-height: 1.6; color: #5F5E5A; }
+  .callout b { color: #2C2C2A; font-weight: 500; }
+  .figure { margin: 14px 0; border: 1px solid #E4E2DB; border-radius: 12px; overflow: hidden; background: #FAFAF7; }
+  .figure img { display: block; width: 100%; height: auto; }
+  .figure figcaption { font-size: 11px; color: #888780; line-height: 1.5; padding: 9px 14px; border-top: 1px solid #E4E2DB; }
+  .figure figcaption b { color: #5F5E5A; font-weight: 500; }
+  .cmp-wrap { margin: 12px 0; overflow-x: auto; }
+  .cmp-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .cmp-table th, .cmp-table td { border: 1px solid #E4E2DB; padding: 8px 10px; text-align: left; vertical-align: top; }
+  .cmp-table thead th { background: #F1EFE8; font-weight: 500; color: #2C2C2A; font-size: 11px; text-transform: uppercase; letter-spacing: .4px; }
+  .cmp-table td.old { color: #5F5E5A; }
+  .cmp-table td.cost { color: #993C1D; }
+  .cmp-table td.new { color: #27500A; font-weight: 500; }
+  .cmp-table td:first-child { font-weight: 500; color: #2C2C2A; }
+  .principle-list { list-style: none; padding-left: 0; }
+  .principle-list.dl > div { border: 1px solid #E4E2DB; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+  .principle-list.dl h4 { font-size: 13px; font-weight: 500; color: #2C2C2A; margin-bottom: 3px; }
+  .principle-list.dl p { font-size: 12px; color: #5F5E5A; line-height: 1.5; }
+
+  /* Tier ladder */
+  .build-ladder { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+  .phase { display: grid; grid-template-columns: 30px 1fr; gap: 12px; align-items: start; border: 1px solid #E4E2DB; border-radius: 10px; padding: 11px 14px; transition: border-color .15s, box-shadow .15s, transform .15s; }
+  .phase:hover { border-color: #B4B2A9; box-shadow: 0 3px 10px rgba(0,0,0,.05); }
+  .phase .pnum { width: 26px; height: 26px; border-radius: 50%; background: #2C2C2A; color: #fff; font-weight: 600; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+  .phase .pbuild { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin-bottom: 5px; }
+  .phase .plabel { font-size: 10px; text-transform: uppercase; letter-spacing: .4px; color: #888780; font-weight: 500; }
+  .phase .pget { font-size: 12px; color: #5F5E5A; line-height: 1.5; }
+  .phase .pget b { color: #2C2C2A; font-weight: 500; }
+  .mvp-callout { background: #EAF3DE; border: 1px solid #97C459; border-radius: 10px; padding: 12px 16px; margin: 12px 0; font-size: 13px; line-height: 1.6; color: #3B6D11; }
+  .mvp-callout b { color: #27500A; font-weight: 600; }
+
+  /* Source coverage table */
+  .src-wrap { margin-top: 12px; overflow-x: auto; }
+  .src-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .src-table th, .src-table td { border: 1px solid #E4E2DB; padding: 7px 9px; text-align: left; vertical-align: middle; }
+  .src-table thead th { background: #111111; color: #fff; font-weight: 500; font-size: 10px; text-transform: uppercase; letter-spacing: .4px; }
+  .src-table td.tier { font-weight: 500; color: #2C2C2A; white-space: nowrap; }
+  .src-table .pill { font-size: 10px; font-weight: 500; border-radius: 20px; padding: 1px 8px; border: 1px solid; white-space: nowrap; }
+  .pill.green { background: #EAF3DE; color: #27500A; border-color: #97C459; }
+  .pill.blue { background: #E6F1FB; color: #0C447C; border-color: #85B7EB; }
+  .pill.coral { background: #FAECE7; color: #712B13; border-color: #F0997B; }
+  .pill.tan { background: #F1EFE8; color: #5F5E5A; border-color: #B4B2A9; }
+  .src-table tr:hover td { background: #FBFAF6; }
+
+  /* Resource cards + repo banner */
+  .repo-banner { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; background: #111111; border-radius: 12px; padding: 16px 22px; margin: 14px 0; }
+  .repo-banner .rb-t { color: #fff; font-size: 15px; font-weight: 500; }
+  .repo-banner .rb-s { color: #B4B2A9; font-size: 12px; margin-top: 3px; max-width: 560px; line-height: 1.5; }
+  .repo-banner .rb-btn { background: #fff; color: #111; font-weight: 500; font-size: 13px; padding: 9px 17px; border-radius: 8px; text-decoration: none; white-space: nowrap; transition: background .15s, transform .15s; }
+  .repo-banner .rb-btn:hover { background: #EAF3DE; transform: translateY(-1px); }
+  .resource-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin: 12px 0; }
+  .res-card { border: 1px solid #E4E2DB; border-radius: 10px; padding: 12px 14px; text-decoration: none; display: block; background: #fff; transition: border-color .15s, box-shadow .15s, transform .15s; }
+  .res-card:hover { border-color: #0d76eb; transform: translateY(-2px); box-shadow: 0 5px 16px rgba(0,0,0,.08); }
+  .res-card .rc-t { font-size: 13px; font-weight: 500; color: #2C2C2A; margin-bottom: 3px; display: flex; align-items: center; gap: 7px; }
+  .res-card .rc-ic { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+  .res-card .rc-d { font-size: 12px; color: #5F5E5A; line-height: 1.45; }
+
+  .foot { margin-top: 28px; padding-top: 16px; border-top: 1px solid #E4E2DB; font-size: 12px; color: #888780; line-height: 1.6; }
+  .foot a { color: #185FA5; }
+
+  /* ============ INTERACTIVITY LAYER ============ */
+  #progress { position: fixed; top: 0; left: 0; height: 3px; width: 0; background: linear-gradient(90deg,#84c65a,#0d76eb); z-index: 60; transition: width .1s linear; }
+  #toolbar { position: fixed; top: 14px; right: 14px; z-index: 55; display: flex; gap: 6px; align-items: center; }
+  #toolbar button { font-family: inherit; font-size: 11px; font-weight: 500; color: #5F5E5A; background: rgba(255,255,255,.85); backdrop-filter: blur(6px); border: 1px solid #D3D1C7; border-radius: 20px; padding: 5px 11px; cursor: pointer; transition: all .15s; display: inline-flex; align-items: center; gap: 5px; box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+  #toolbar button:hover { border-color: #B4B2A9; color: #2C2C2A; transform: translateY(-1px); }
+  #toolbar button.on { background: #2C2C2A; color: #fff; border-color: #2C2C2A; }
+
+  .term { border-bottom: 1px dashed #B4B2A9; cursor: help; color: inherit; position: relative; transition: background .15s, border-color .15s; border-radius: 2px; }
+  .term:hover, .term:focus, .term.open { background: #FAEEDA; border-bottom-color: #EF9F27; outline: none; }
+  .term:focus-visible { box-shadow: 0 0 0 2px #EF9F27; }
+  .term::after { content: "?"; font-size: 8px; font-weight: 600; color: #B4B2A9; vertical-align: super; margin-left: 1px; line-height: 0; }
+
+  #tip { position: fixed; z-index: 70; max-width: 290px; background: #2C2C2A; color: #F1EFE8; font-size: 12px; line-height: 1.5; padding: 10px 13px; border-radius: 9px; box-shadow: 0 8px 28px rgba(0,0,0,.22); opacity: 0; transform: translateY(4px); pointer-events: none; transition: opacity .14s, transform .14s; }
+  #tip.show { opacity: 1; transform: translateY(0); }
+  #tip .tip-term { display: block; font-weight: 600; color: #fff; margin-bottom: 3px; font-size: 12px; letter-spacing: .2px; }
+  #tip .tip-def { color: #CFCDC5; }
+  #tip::after { content: ""; position: absolute; width: 9px; height: 9px; background: #2C2C2A; transform: rotate(45deg); }
+  #tip.below::after { top: -4px; left: var(--ax,20px); }
+  #tip.above::after { bottom: -4px; left: var(--ax,20px); }
+
+  body.spot .spotdim { opacity: .28; filter: saturate(.4); transition: opacity .2s, filter .2s; }
+  .spot-hit { position: relative; z-index: 1; }
+  .fbox.spot-hit, .detail-card.spot-hit, .info-card.spot-hit, .phase.spot-hit { box-shadow: 0 0 0 2px #EF9F27, 0 6px 18px rgba(239,159,39,.25); border-radius: 10px; }
+  .dc-agent.spot-hit, .pill.spot-hit { box-shadow: 0 0 0 2px #EF9F27; border-radius: 20px; }
+  .clickable-agent { cursor: pointer; }
+  .clickable-agent:hover { filter: brightness(.97); }
+
+  .color-legend .ci { cursor: pointer; padding: 2px 6px; border-radius: 6px; transition: background .15s, opacity .15s; user-select: none; }
+  .color-legend .ci:hover { background: #F1EFE8; }
+  .color-legend .ci.on { background: #FAEEDA; }
+
+  .flow-h .fbox, .hub-band .fbox { cursor: pointer; }
+  .flow-h .fbox:hover, .hub-band .fbox:hover { transform: translateY(-2px); box-shadow: 0 5px 14px rgba(0,0,0,.10); }
+  @keyframes pulseCard { 0%,100% { box-shadow: 0 0 0 0 rgba(239,159,39,0); } 30% { box-shadow: 0 0 0 3px rgba(239,159,39,.6); } }
+  .pulse { animation: pulseCard 1.1s ease 1; }
+  .fbox { transition: opacity .2s, filter .2s, box-shadow .15s, transform .15s; }
+
+  #hint { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%) translateY(30px); z-index: 55; background: #2C2C2A; color: #F1EFE8; font-size: 12px; padding: 8px 15px; border-radius: 22px; box-shadow: 0 6px 20px rgba(0,0,0,.2); opacity: 0; transition: opacity .3s, transform .3s; pointer-events: none; }
+  #hint.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  #hint b { color: #84c65a; font-weight: 600; }
+
+  /* ============ DARK MODE ============ */
+  body.dark { background: #17171A; color: #C9C7BF; }
+  body.dark .hero { border-color: #34343A; }
+  body.dark .hero h1, body.dark .section-title, body.dark .info-card h4, body.dark .dc-step,
+  body.dark .prop-card h4, body.dark .cb-title, body.dark .principle-list b, body.dark .callout b,
+  body.dark .quote, body.dark .type-strip b, body.dark .principle-list.dl h4,
+  body.dark .cmp-table td:first-child, body.dark .cmp-table thead th { color: #EDEBE4; }
+  body.dark .hero .sub, body.dark .lede, body.dark .lede.small, body.dark .info-card p,
+  body.dark .detail-card .dc-body, body.dark .prop-card p, body.dark .callout, body.dark .cb-sub,
+  body.dark .type-strip, body.dark .foot, body.dark .principle-list, body.dark .color-legend,
+  body.dark .principle-list.dl p, body.dark .figure figcaption, body.dark .phase .pget { color: #A9A79F; }
+  body.dark .info-card, body.dark .detail-card, body.dark .prop-card, body.dark .conductor-bar,
+  body.dark .type-strip, body.dark .callout, body.dark #toolbar button, body.dark .phase,
+  body.dark .res-card, body.dark .figure, body.dark .principle-list.dl > div { background: #212024; border-color: #38373D; }
+  body.dark #toolbar button { color: #C9C7BF; }
+  body.dark #toolbar button:hover { color: #fff; border-color: #55545B; }
+  body.dark .prop-card, body.dark .figure { background: #1E1D21; }
+  body.dark .cmp-table td, body.dark .cmp-table th, body.dark .src-table td { background: #1E1D21; border-color: #34343A; }
+  body.dark .cmp-table thead th { background: #2A2930; }
+  body.dark .figure figcaption { border-color: #34343A; }
+  body.dark a, body.dark .foot a, body.dark .lede a, body.dark .hero .sub a { color: #7FB2F0; }
+  body.dark .section-title, body.dark .hero h1 { color: #F1EFE8; }
+  body.dark #progress { background: linear-gradient(90deg,#97C459,#4a95e8); }
+  body.dark .term:hover, body.dark .term.open { background: #4a3d1c; }
+  body.dark .phase .pnum { background: #45444C; color: #EDEBE4; }
+  body.dark .phase .pget b { color: #EDEBE4; }
+  body.dark .res-card:hover { border-color: #4a95e8; }
+  body.dark .res-card .rc-t { color: #EDEBE4; }
+  body.dark .res-card .rc-d { color: #A9A79F; }
+  body.dark .cmp-table tr:hover td, body.dark .src-table tr:hover td { background: #26252A; }
+  body.dark .mvp-callout { background: #1f2a17; border-color: #3f5a26; color: #b6d894; }
+  body.dark .mvp-callout b { color: #d4ecb8; }
+
+  @media (max-width: 640px) {
+    #toolbar button span.lbl { display: none; }
+    #tip { max-width: 76vw; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>Job aggregation pipeline &mdash; a case study</h1>
+  <div class="sub">The nightly data pipeline behind <a href="https://getajobintech.co.za" target="_blank" rel="noopener">getajobintech.co.za</a>, a South African tech job board. It collects listings from several job boards every night, cleans and tags them with AI, and publishes one deduplicated feed the website can trust.</div>
+  <div class="color-legend">
+    <div class="ci"><span class="swatch" style="background:#EAF3DE;border-color:#84c65a"></span> Extract</div>
+    <div class="ci"><span class="swatch" style="background:#E6F1FB;border-color:#0d76eb"></span> Transform &middot; AI</div>
+    <div class="ci"><span class="swatch" style="background:#111111;border-color:#111111"></span> Store</div>
+    <div class="ci"><span class="swatch" style="background:#FAECE7;border-color:#F0997B"></span> Resilience</div>
+    <div class="ci"><span class="swatch" style="background:#F1EFE8;border-color:#B4B2A9"></span> Orchestration</div>
+  </div>
+</div>
+
+<div class="lede small">Written for fellow engineers, scraping nerds and hiring managers &mdash; not as a setup guide. It explains the problem, the shape of the system, the decisions I made, and the trade-offs I weighed. Click any coloured chip or legend item to <b>spotlight</b> that stage across the page; hover the <b>dotted</b> terms for plain-language definitions.</div>
+
+<div class="callout"><b>Scope note.</b> This document deliberately abstracts the specific sources, vendors, and endpoints. It is a design write-up, not a runbook &mdash; the goal is to show the thinking.</div>
+
+<figure class="figure">
+  <img src="./images/demo.gif" alt="Get a Job in Tech demo — the live job board built on this pipeline.">
+  <figcaption><b>The product.</b> getajobintech.co.za, the live board the pipeline feeds every night.</figcaption>
+</figure>
+
+<div class="section-label">The one idea</div>
+<div class="section-title">Read a site the way the site reads itself</div>
+<div class="lede">I have been really inspired by what the team at <a href="https://parse.bot/" target="_blank" rel="noopener">Parse.bot</a> has been doing. But I did not want to pay for yet another subscription, so I tried to reverse-engineer their approach to unlocking the data on the internet.</div>
+<div class="lede">The most robust way to read a site is the way the site reads itself. So for every source I look for <span class="term" tabindex="0" data-term="structured data">structured data</span> before reaching for a <span class="term" tabindex="0" data-term="scraper">scraper</span>. Only genuinely messy HTML gets the AI-extraction treatment, validated against a fixed <span class="term" tabindex="0" data-term="schema">schema</span>.</div>
+<div class="quote">A structured feed survives a visual redesign. A brittle parser does not.
+  <span class="attr">The single most important design choice in the pipeline</span></div>
+
+<div class="section-label">The problem it removes</div>
+<div class="section-title">Scraping that quietly rots</div>
+<div class="lede">Job boards change their markup, block datacentre traffic, and <span class="term" tabindex="0" data-term="rate-limit">rate-limit</span> aggressively. My first version was a single Python job on a scheduler. Let's just say the source websites did not like this approach at all &#128133; Three failure modes drove the rebuild.</div>
+<div class="card-grid">
+  <div class="info-card debt"><div class="tagline">Failure 1</div><h4>Datacentre traffic gets blocked</h4><p>Running from shared cloud IPs with a stale <span class="term" tabindex="0" data-term="TLS fingerprint">TLS fingerprint</span> triggered bot walls and bans.</p></div>
+  <div class="info-card debt"><div class="tagline">Failure 2</div><h4>Brittle parsing breaks on layout change</h4><p>Guessing fields by line position meant any redesign silently corrupted the data.</p></div>
+  <div class="info-card debt"><div class="tagline">Failure 3</div><h4>All-or-nothing runs lose everything</h4><p>One big batch with a late failure threw away a whole night's work.</p></div>
+</div>
+<div class="cmp-wrap">
+<table class="cmp-table">
+  <thead><tr><th>Old approach</th><th>What it cost</th><th>New approach</th></tr></thead>
+  <tbody>
+    <tr><td class="old">Datacentre IPs, fixed fingerprint</td><td class="cost">Blocks and bans</td><td class="new"><span class="term" tabindex="0" data-term="residential proxy">Residential-proxy</span> anti-bot layer, used only when needed</td></tr>
+    <tr><td class="old">Position-based HTML parsing</td><td class="cost">Corrupt data on redesign</td><td class="new">Structured data first, AI extraction for the messy rest</td></tr>
+    <tr><td class="old">One monolithic batch</td><td class="cost">Total loss on any failure</td><td class="new">Per-source isolation, save-as-you-go</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="section-label">The whole system</div>
+<div class="section-title">A nightly ETL flow: extract many, transform with AI, load one clean feed</div>
+<div class="lede">The pipeline is a nightly <span class="term" tabindex="0" data-term="ETL">ETL</span> flow. Each stage is decoupled so a problem in one never cascades into the next. Several job boards feed per-source workers, which land raw rows in a <span class="term" tabindex="0" data-term="staging">staging</span> store. A separate AI step cleans and tags them, then publishes to the live feed the website reads.</div>
+
+<div class="loop-head green">Extract &mdash; several SA tech boards feed per-source workers</div>
+<div class="flow-h">
+  <div class="fbox green"><div class="fstep">Sources</div><div class="fagent">APIs &middot; embedded data &middot; private JSON &middot; anti-bot</div></div>
+  <span class="arrow-r">&rarr;</span>
+  <div class="fbox green"><div class="fstep">Workers</div><div class="fagent">one per source</div></div>
+</div>
+
+<div class="hub-band">
+  <div class="fbox dark"><div class="fstep">Staging</div><div class="fagent">raw rows &middot; save-as-you-go</div></div>
+  <div class="fbox blue"><div class="fstep">Enrichment</div><div class="fagent">AI clean + tag &middot; own schedule</div></div>
+  <div class="fbox dark"><div class="fstep">Live feed</div><div class="fagent">clean jobs the website reads</div></div>
+</div>
+<div class="return-note green"><span>&#8635;</span> A problem in any stage is isolated &mdash; it never cascades into the next</div>
+
+<div class="conductor-bar">
+  <div class="cb-title">Orchestration &mdash; n8n + managed Postgres</div>
+  <div class="cb-sub">The flow runs on <span class="term" tabindex="0" data-term="n8n">n8n</span>, a <span class="term" tabindex="0" data-term="workflow engine">workflow engine</span>, with a managed <span class="term" tabindex="0" data-term="Postgres">Postgres</span> database as the store. Everything else &mdash; the proxy layer, the AI provider, the extraction service &mdash; is swappable behind a clear boundary.</div>
+</div>
+
+<div class="type-strip">
+  <b style="color:#2C2C2A;font-weight:500">Who does what:</b>
+  <div class="ti"><span class="type-dot" style="border-color:#84c65a;background:#EAF3DE"></span> <b>Workers</b> acquire, normalise, validate</div>
+  <div class="ti"><span class="type-dot" style="border-color:#0d76eb;background:#E6F1FB"></span> <b>Enrichment</b> cleans and tags</div>
+  <div class="ti"><span class="type-dot" style="border-color:#111111;background:#111111"></span> <b>Store</b> holds staging + the live feed</div>
+</div>
+
+<div class="section-label">Design principle &middot; acquisition</div>
+<div class="section-title">Prefer a site's own structured data; use AI only for the mess</div>
+<div class="lede">For every source I work down the tiers and stop at the first one it supports. The higher the tier, the more intense it is to build and the more expensive it is to maintain. This ordering minimises the surface that can break.</div>
+<div class="build-ladder">
+  <div class="phase">
+    <div class="pnum">1</div>
+    <div class="pbody">
+      <div class="pbuild"><span class="plabel">Tier 1 &middot; most robust</span><span class="dc-agent green">Extract</span></div>
+      <div class="pget"><b>Official or partner API available?</b> Use the API. The cleanest, most stable contract a source can offer.</div>
+    </div>
+  </div>
+  <div class="phase">
+    <div class="pnum">2</div>
+    <div class="pbody">
+      <div class="pbuild"><span class="plabel">Tier 1 &middot; deterministic, no AI</span><span class="dc-agent green">Extract</span></div>
+      <div class="pget"><b>Data embedded in the initial page HTML?</b> Parse the embedded structured data directly &mdash; survives a visual redesign.</div>
+    </div>
+  </div>
+  <div class="phase">
+    <div class="pnum">3</div>
+    <div class="pbody">
+      <div class="pbuild"><span class="plabel">Tier 2</span><span class="dc-agent green">Extract</span></div>
+      <div class="pget"><b>Private JSON backend the site's own app calls?</b> Call that <span class="term" tabindex="0" data-term="private JSON backend">private JSON source</span> the front-end already uses.</div>
+    </div>
+  </div>
+  <div class="phase">
+    <div class="pnum">4</div>
+    <div class="pbody">
+      <div class="pbuild"><span class="plabel">Tier 3 / 4 &middot; last resort</span><span class="dc-agent blue">Transform</span><span class="dc-agent coral">Resilience</span></div>
+      <div class="pget"><b>Strong <span class="term" tabindex="0" data-term="anti-bot">anti-bot</span>, or no clean source?</b> AI extraction validated against the schema, or a library-based service behind the residential-proxy layer.</div>
+    </div>
+  </div>
+</div>
+
+<div class="section-label">Design principle &middot; structure</div>
+<div class="section-title">Three decisions that keep adding a source cheap</div>
+<div class="principle-list dl">
+  <div><h4>Separate how you fetch from how you read</h4><p><b>Transport</b> (getting the bytes) and <b>extraction</b> (reading the fields) are independent choices. A source can fetch over plain HTTP today and switch to the proxy layer tomorrow without touching the parser. Anti-blocking becomes a config flip, not a rewrite.</p></div>
+  <div><h4>Normalise everything to one schema</h4><p>Every source, however it is acquired, produces rows in one unified schema of about 30 fields &mdash; title, company, location, salary, remote policy, and so on. A <span class="term" tabindex="0" data-term="canonical URL">canonical job URL</span> is the required <span class="term" tabindex="0" data-term="dedup">deduplication</span> key, so re-scraping a listing <span class="term" tabindex="0" data-term="upsert">updates</span> it rather than duplicating it. The enrichment step and the website never need to know where a row came from.</p></div>
+  <div><h4>One reusable contract per source</h4><p>Adding a board is deliberately cheap: one config row plus one small worker that follows a shared five-step contract. New sources inherit all the resilience guarantees for free.</p></div>
+</div>
+
+<div class="loop-head green">The contract every source worker follows</div>
+<div class="flow-h">
+  <div class="fbox green"><div class="fstep">Acquire</div><div class="fagent">API, embedded data, or service</div></div>
+  <span class="arrow-r">&rarr;</span>
+  <div class="fbox green"><div class="fstep">Paginate &amp; pace</div><div class="fagent">randomised delays</div></div>
+  <span class="arrow-r">&rarr;</span>
+  <div class="fbox green"><div class="fstep">Normalise</div><div class="fagent">to the one schema</div></div>
+  <span class="arrow-r">&rarr;</span>
+  <div class="fbox green"><div class="fstep">Validate</div><div class="fagent">has a title and a URL?</div></div>
+  <span class="arrow-r">&rarr;</span>
+  <div class="fbox dark"><div class="fstep">Upsert</div><div class="fagent">this page to staging</div></div>
+</div>
+<div class="return-note green"><span>&#8635;</span> Loop to the next page. Invalid rows are set aside for review, never dropped</div>
+
+<div class="section-label">Resilience</div>
+<div class="section-title">Finished work must always be durable, and no source can break another</div>
+<div class="lede">Several patterns enforce the guiding rule. Together they turn a fragile nightly job into something that degrades gracefully instead of losing a night's work.</div>
+<div class="detail-grid">
+  <div class="detail-card coral"><div class="dc-head"><span class="dc-step">Per-source isolation</span><span class="dc-agent coral">Resilience</span></div><div class="dc-body">The orchestrator runs each source in its own worker and continues past any failure, so one crash is logged and skipped.</div></div>
+  <div class="detail-card coral"><div class="dc-head"><span class="dc-step">Save-as-you-go</span><span class="dc-agent coral">Resilience</span></div><div class="dc-body">Every page is written to staging <em>before</em> the next page is fetched, so a mid-run crash keeps everything collected so far.</div></div>
+  <div class="detail-card coral"><div class="dc-head"><span class="dc-step">Resumable runs</span><span class="dc-agent coral">Resilience</span></div><div class="dc-body">Lightweight <span class="term" tabindex="0" data-term="checkpoint">checkpoints</span> record how far each source got, so an interrupted run picks up where it stopped.</div></div>
+  <div class="detail-card coral"><div class="dc-head"><span class="dc-step">Decoupled enrichment</span><span class="dc-agent blue">Transform</span></div><div class="dc-body">The AI step reads from the database on its own schedule, so a scraping failure never blocks enrichment and vice versa.</div></div>
+  <div class="detail-card coral"><div class="dc-head"><span class="dc-step">Retry with a cap</span><span class="dc-agent coral">Resilience</span></div><div class="dc-body">A failed AI call increments an attempt counter without marking the row done, so it retries next run and gives up after three tries instead of looping forever.</div></div>
+  <div class="detail-card coral"><div class="dc-head"><span class="dc-step">A single-run lock</span><span class="dc-agent coral">Resilience</span></div><div class="dc-body">The enrichment schedule takes a lock with a stale timeout, so overlapping ticks can't double-process or corrupt state.</div></div>
+</div>
+
+<div class="loop-head coral">How isolation and decoupling protect the work</div>
+<div class="flow-h">
+  <div class="fbox tan"><div class="fstep">Nightly schedule</div><div class="fagent">reads enabled sources</div></div>
+  <span class="arrow-r">&rarr;</span>
+  <div class="fbox green"><div class="fstep">Fan out</div><div class="fagent">independent workers &middot; continue on fail</div></div>
+  <span class="arrow-r">&rarr;</span>
+  <div class="fbox dark"><div class="fstep">Staging</div><div class="fagent">upsert per page</div></div>
+  <span class="arrow-r">&rarr;</span>
+  <div class="fbox blue"><div class="fstep">Enrichment</div><div class="fagent">own clock + lock &middot; retry, cap at 3</div></div>
+  <span class="arrow-r">&rarr;</span>
+  <div class="fbox coral"><div class="fstep">Health snapshot</div><div class="fagent">one-line digest alert</div></div>
+</div>
+
+<div class="callout"><b>Polite by default.</b> Scraping responsibly is both an ethics choice and a survival strategy. Each source runs with randomised delays, single-domain <span class="term" tabindex="0" data-term="concurrency">concurrency</span>, and long pauses between batches. On repeated rate-limit responses a source <span class="term" tabindex="0" data-term="circuit breaker">circuit-breaks</span> for the night rather than hammering into a ban.</div>
+
+<div class="quote">A silently broken source used to look identical to a quiet night. Now every enrichment run writes one health record &mdash; rows processed, backlog size, sources succeeded versus failed &mdash; and posts a one-line digest to a chat channel. A green run and a degraded run are now visibly different.
+  <span class="attr">An observability snapshot, not just logs</span></div>
+
+<div class="section-label">Trade-offs</div>
+<div class="section-title">Decided against &mdash; the roads not taken</div>
+<div class="lede">The trade-offs I am most deliberate about are the things I chose <em>not</em> to build. The pattern: I optimise for coverage per unit of fragility, not raw source count.</div>
+<div class="card-grid">
+  <div class="info-card debt"><div class="tagline">Rejected</div><h4>A low-coverage board</h4><p>HTML-only with no structured data, returning roughly 0.3% of another board's coverage for the same query at meaningful monthly proxy cost. Not worth the maintenance.</p></div>
+  <div class="info-card debt"><div class="tagline">Deferred</div><h4>A high-profile professional network</h4><p>High Terms-of-Service and block risk meant the downside outweighed the marginal listings. Deferred, not built.</p></div>
+  <div class="info-card debt"><div class="tagline">Dropped</div><h4>Framework-specific search terms</h4><p>Pulled noise with no matching place to file the results, so they came out of the query set.</p></div>
+</div>
+
+<div class="section-label">AI enrichment</div>
+<div class="section-title">Collapsing chaos into a canonical role</div>
+<div class="lede">Raw job titles are chaos &mdash; <em>"Senior Angular Full Stack DOTNET Developer"</em>, <em>"1st-line Support Tech"</em>, <em>"Cyber Security Specialist"</em>. The website needs clean buckets to build landing pages and trend charts. So <span class="term" tabindex="0" data-term="enrichment">enrichment</span> collapses every title onto a small fixed set of canonical roles &mdash; around two dozen &mdash; with a deliberately small <em>Other</em> bucket for genuine non-tech roles. The collapse runs in three layers, each a safety net for the one before.</div>
+
+<div class="loop-head blue">Three layers &mdash; each a safety net for the last</div>
+<div class="flow-h">
+  <div class="fbox blue"><div class="fstep">Layer 1</div><div class="fagent"><span style="font-style:italic">LLM</span> picks the closest canonical role</div></div>
+  <span class="arrow-r">&rarr;</span>
+  <div class="fbox blue"><div class="fstep">Layer 2</div><div class="fagent">deterministic keyword rules &middot; most-specific-first</div></div>
+  <span class="arrow-r">&rarr;</span>
+  <div class="fbox blue"><div class="fstep">Layer 3</div><div class="fagent">backfill repairs legacy rows &middot; no AI cost</div></div>
+  <span class="arrow-r">&rarr;</span>
+  <div class="fbox dark"><div class="fstep">Output</div><div class="fagent">one canonical role, or a small 'Other'</div></div>
+</div>
+
+<div class="lede small">Why three? The <span class="term" tabindex="0" data-term="LLM">LLM</span> is good at semantics but not reliable enough to trust alone. The <span class="term" tabindex="0" data-term="deterministic">deterministic</span> rules are the source of truth for new rows and catch the LLM's mistakes &mdash; testing the most specific patterns first so a full-stack role never gets filed as frontend. The <span class="term" tabindex="0" data-term="backfill">backfill</span> repairs historical rows for free, with no additional LLM calls.</div>
+<div class="callout">The hard-won lesson: a free-text role field let <em>"Other"</em> become the single largest category on the board, which polluted the trend pages. Forcing every title through a fixed <span class="term" tabindex="0" data-term="taxonomy">taxonomy</span> fixed that at the root.</div>
+
+<div class="section-label">Proof it runs</div>
+<div class="section-title">The enrichment workflow in production</div>
+<div class="lede">The diagram above is the concept. Here is what it looks like when it runs &mdash; the real system, every night.</div>
+<figure class="figure">
+  <img src="./images/enrichment-workflow.png" alt="The enrichment workflow running in n8n: acquire lock, denylist check, select unenriched jobs, loop through them, branch on non-tech roles, call the LLM for semantic enrichment, deterministically normalise the role, check again, upsert to the live feed, mark done, release the lock, emit a health snapshot, and post a digest alert.">
+  <figcaption><b>The enrichment workflow in n8n.</b> The boxes are n8n nodes; the paths show data flow and decision branches &mdash; the fork where non-tech roles skip the AI call, the retry path when the LLM fails, the loop that processes a batch before releasing the lock. The abstract three-layer model above is the <em>concept</em>; this is the <em>proof</em> it actually works.</figcaption>
+</figure>
+
+<div class="section-label">Beyond roles</div>
+<div class="section-title">The rest of the enrichment surface</div>
+<div class="lede small">Role normalisation is the headline, but the enrichment step handles several other cleanup jobs that share the same philosophy &mdash; deterministic rules where possible, AI only where the text is genuinely ambiguous.</div>
+<div class="detail-grid">
+  <div class="detail-card blue"><div class="dc-head"><span class="dc-step">A non-tech gate</span><span class="dc-agent blue">Transform</span></div><div class="dc-body">After the AI call, filters out listings that slipped past the source queries &mdash; <em>"Girl Friday / Admin"</em>, <em>"Bridge Engineer"</em>, <em>"Tax Specialist"</em>. The AI flags each row as tech or non-tech; a second deterministic check catches cases it missed (role is <em>Other</em> and no recognisable tech skill). Rejected rows stay in staging and never reach the live feed.</div></div>
+  <div class="detail-card blue"><div class="dc-head"><span class="dc-step">Job-level canonicalisation</span><span class="dc-agent blue">Transform</span></div><div class="dc-body">Collapses the zoo of seniority labels &mdash; <em>"Mid-Level"</em>, <em>"Intermediate"</em>, <em>"Other"</em>, the literal string <em>"null"</em> &mdash; onto four buckets: junior, mid, senior, lead. Kept byte-for-byte identical to a database trigger on the board side, so neither system can drift.</div></div>
+  <div class="detail-card blue"><div class="dc-head"><span class="dc-step">Skill casing</span><span class="dc-agent blue">Transform</span></div><div class="dc-body">Deduplicates and canonicalises the top ~120 skill strings (<em>"reactjs"</em> &rarr; <em>"React"</em>, <em>"node.js"</em> &rarr; <em>"Node.js"</em>, <em>"ms sql"</em> &rarr; <em>"SQL Server"</em>) so the board's skill facets don't show one technology under three spellings.</div></div>
+  <div class="detail-card blue"><div class="dc-head"><span class="dc-step">City normalisation</span><span class="dc-agent blue">Transform</span></div><div class="dc-body">Rewrites remote-job location noise &mdash; province codes, country names, <em>"South Africa"</em> &mdash; into a single <em>"Remote"</em> token so the location filter works cleanly.</div></div>
+  <div class="detail-card blue"><div class="dc-head"><span class="dc-step">A taxonomy review label</span><span class="dc-agent blue">Transform</span></div><div class="dc-body">The <code>other_role</code> field captures the AI's free-text role suggestion whenever the deterministic rules land on <em>Other</em>, giving me a review queue to spot emerging roles that deserve their own bucket.</div></div>
+</div>
+
+<div class="section-label">Current scope</div>
+<div class="section-title">What feeds the pipeline today, by tier</div>
+<div class="lede small">Several boards across the tiers feed the pipeline today. Honest current state below &mdash; live sources, what is deferred, and what is next.</div>
+<div class="src-wrap">
+<table class="src-table">
+  <thead><tr><th>Tier</th><th>Source shape</th><th>How it's acquired</th><th>Status</th></tr></thead>
+  <tbody>
+    <tr><td class="tier">Tier 1</td><td>Official / partner API</td><td><span class="pill green">Extract</span> direct API</td><td>Live</td></tr>
+    <tr><td class="tier">Tier 1</td><td>Data embedded in the page</td><td><span class="pill green">Extract</span> parse embedded data</td><td>Live</td></tr>
+    <tr><td class="tier">Tier 2</td><td>Private JSON backend</td><td><span class="pill green">Extract</span> call the site's own JSON</td><td>Live</td></tr>
+    <tr><td class="tier">Tier 3 / 4</td><td>Behind strong anti-bot</td><td><span class="pill coral">Resilience</span> proxy + library service</td><td>Live</td></tr>
+    <tr><td class="tier">&mdash;</td><td>High-profile professional network</td><td><span class="pill tan">Deferred</span> pending a safer path</td><td>Deferred</td></tr>
+    <tr><td class="tier">Next</td><td>Richer salary + deep history</td><td><span class="pill blue">Transform</span> salary normalisation, backfill mode</td><td>Planned</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="section-label">Keeping the docs honest</div>
+<div class="section-title">A doc-guard that makes documentation part of the work</div>
+<div class="lede">Keeping daily testing, learning, and docs up to date is extremely important with the fragility of scrapers. So I built a forcing function into the development workflow itself. An automated guard runs every time a coding session ends. It diffs what changed: if any pipeline code was touched but no documentation was updated, the session is blocked from closing until the docs catch up. You can't ship the change and promise yourself you'll document it later.</div>
+<div class="flow-h">
+  <div class="fbox tan"><div class="fstep">Pipeline code changes</div><div class="fagent">workflows &middot; schema &middot; config &middot; database</div></div>
+  <span class="arrow-r">&rarr;</span>
+  <div class="fbox coral"><div class="fstep">Doc guard</div><div class="fagent">runs on session end &mdash; a gate, not a checklist</div></div>
+  <span class="arrow-r">&rarr;</span>
+  <div class="fbox dark"><div class="fstep">Docs in sync?</div><div class="fagent">no &rarr; blocked until updated</div></div>
+  <span class="arrow-r">&rarr;</span>
+  <div class="fbox green"><div class="fstep">Session closes</div><div class="fagent">cleanly</div></div>
+</div>
+<div class="callout">This matters beyond keeping the README current. It encodes a value: <b>documentation is part of the work, not a trailing task.</b> The guard makes that impossible to defer.</div>
+
+<div class="section-label">Go deeper</div>
+<div class="section-title">The board, and the write-up</div>
+<div class="repo-banner">
+  <div class="rb-l">
+    <div class="rb-t">getajobintech.co.za</div>
+    <div class="rb-s">The live South African tech job board this pipeline feeds every night &mdash; one deduplicated, AI-cleaned feed across several sources.</div>
+  </div>
+  <a class="rb-btn" href="https://getajobintech.co.za" target="_blank" rel="noopener">Visit the board &rarr;</a>
+</div>
+<div class="resource-grid">
+  <a class="res-card" href="https://getajobintech.co.za" target="_blank" rel="noopener">
+    <div class="rc-t"><span class="rc-ic" style="background:#84c65a"></span>The live board</div>
+    <div class="rc-d">Landing pages, trend charts, and filters built on the canonical roles, seniority buckets, and skill facets this pipeline produces.</div>
+  </a>
+  <a class="res-card" href="https://parse.bot/" target="_blank" rel="noopener">
+    <div class="rc-t"><span class="rc-ic" style="background:#0d76eb"></span>Parse.bot</div>
+    <div class="rc-d">The team whose approach to unlocking web data inspired the structured-data-first philosophy at the core of this design.</div>
+  </a>
+</div>
+
+<div class="foot">
+  A design write-up, not a runbook &mdash; the sources, vendors, and endpoints are deliberately abstracted. The throughline: prefer a site's own structured data, isolate every source, make finished work durable, and let AI clean only the genuinely messy rest.<br>
+  Owner: Jess Klette &middot; Last reviewed: 2026-06-29 &middot; Review cadence: when the architecture changes materially. This is a public case study; the internal build docs live separately.
+</div>
+
+<div id="progress"></div>
+<div id="toolbar">
+  <button id="btn-spot" title="Highlight one pipeline stage across the whole page">&#9678; <span class="lbl">Spotlight: off</span></button>
+  <button id="btn-theme" title="Switch light / dark">&#9680; <span class="lbl">Dark</span></button>
+</div>
+<div id="tip" role="tooltip"></div>
+<div id="hint"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ---------- 1. GLOSSARY (plain-language definitions) ---------- */
+  var GLOSSARY = {
+    "ETL": "Extract, Transform, Load — pull raw data from sources, clean and reshape it, then load it into the store the product reads.",
+    "structured data": "Machine-readable data a site publishes about itself — an API response, embedded JSON, schema.org markup — far more stable than the visible HTML.",
+    "scraper": "A program that reads a web page meant for humans and pulls fields out of it — brittle, because it breaks when the page layout changes.",
+    "scraping": "Reading pages meant for humans and pulling structured fields out of them.",
+    "schema": "The agreed set of fields every row must have, so all sources produce the same shape.",
+    "residential proxy": "An IP address that belongs to a real home connection rather than a data centre, so traffic looks like an ordinary visitor instead of a bot.",
+    "TLS fingerprint": "A signature a server reads from how your client negotiates the HTTPS handshake — a stale or unusual one flags you as automated.",
+    "anti-bot": "Defences a site uses to detect and block automated traffic — IP reputation checks, JavaScript challenges, rate limits.",
+    "rate-limit": "Capping how many requests a client can make in a window; exceed it and you get throttled or blocked.",
+    "upsert": "Insert a row if it's new, or update the existing one if it's already there — keyed here on the canonical job URL.",
+    "dedup": "Merging duplicate entries so the record isn't cluttered with near-identical copies.",
+    "deduplication": "Merging duplicate entries so the record isn't cluttered with near-identical copies.",
+    "staging": "A holding area where raw scraped rows land before they're cleaned, so a crash never touches the live feed.",
+    "canonical URL": "The one official address for a listing, used as the key so re-scraping updates a job instead of duplicating it.",
+    "normalise": "Convert messy inputs of different kinds into one consistent format.",
+    "enrichment": "The step that cleans and tags raw rows — collapsing messy titles to canonical roles, fixing skill casing, filtering non-tech listings.",
+    "checkpoint": "A lightweight record of how far a run got, so an interrupted run resumes instead of starting over.",
+    "circuit breaker": "A safety switch that stops hitting a source after repeated failures, rather than hammering into a ban.",
+    "backfill": "Repairing or filling in older rows in bulk — here, re-tagging legacy jobs with no extra AI cost.",
+    "LLM": "Large Language Model — the AI that reads messy text and proposes the closest canonical role.",
+    "taxonomy": "The fixed vocabulary the data is sorted into — the two dozen canonical roles, four seniority buckets, and so on.",
+    "deterministic": "Rule-based and repeatable: the same input always gives the same output, unlike an LLM's probabilistic guess.",
+    "concurrency": "How many requests run at once — kept to one per domain here to stay polite.",
+    "private JSON backend": "The internal API a site's own front-end calls to load listings — often cleaner and more stable than the rendered page.",
+    "n8n": "An open-source workflow engine — you wire nodes together to orchestrate the pipeline instead of hand-coding the glue.",
+    "workflow engine": "A tool that runs multi-step automations as connected nodes, handling scheduling, branching, and retries for you.",
+    "Postgres": "A robust open-source relational database — here the managed store holding both staging and the live feed.",
+    "provenance": "A traceable link from any output back to the exact evidence it came from."
+  };
+
+  /* ---------- 2. AUTO-WRAP first occurrence of each term ---------- */
+  var SKIP_TAGS = { SCRIPT:1, STYLE:1, A:1, BUTTON:1, TITLE:1, H1:1, CODE:1, FIGCAPTION:1 };
+  var wrapped = {};
+  var terms = Object.keys(GLOSSARY).sort(function (a, b) { return b.length - a.length; });
+
+  function esc(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
+
+  function walk(node) {
+    if (node.nodeType === 1) {
+      if (SKIP_TAGS[node.tagName]) return;
+      if (node.classList && (node.classList.contains("term") || node.classList.contains("dc-agent") || node.classList.contains("pill") || node.classList.contains("swatch"))) return;
+      var kids = Array.prototype.slice.call(node.childNodes);
+      kids.forEach(walk);
+    } else if (node.nodeType === 3) {
+      var text = node.nodeValue;
+      for (var i = 0; i < terms.length; i++) {
+        var t = terms[i];
+        if (wrapped[t]) continue;
+        var re = new RegExp("\\b" + esc(t) + "\\b", "i");
+        var m = re.exec(text);
+        if (m) {
+          var before = text.slice(0, m.index);
+          var hit = text.slice(m.index, m.index + m[0].length);
+          var after = text.slice(m.index + m[0].length);
+          var span = document.createElement("span");
+          span.className = "term";
+          span.setAttribute("tabindex", "0");
+          span.setAttribute("data-term", t);
+          span.textContent = hit;
+          var frag = document.createDocumentFragment();
+          if (before) frag.appendChild(document.createTextNode(before));
+          frag.appendChild(span);
+          var afterNode = document.createTextNode(after);
+          frag.appendChild(afterNode);
+          node.parentNode.replaceChild(frag, node);
+          wrapped[t] = true;
+          walk(afterNode);
+          return;
+        }
+      }
+    }
+  }
+  walk(document.body);
+
+  /* ---------- 3. TOOLTIP behaviour ---------- */
+  var tip = document.getElementById("tip");
+  var openTerm = null;
+
+  function showTip(el) {
+    var key = el.getAttribute("data-term");
+    var def = GLOSSARY[key];
+    if (!def) return;
+    var label = key.charAt(0).toUpperCase() + key.slice(1);
+    tip.innerHTML = '<span class="tip-term"></span><span class="tip-def"></span>';
+    tip.querySelector(".tip-term").textContent = label;
+    tip.querySelector(".tip-def").textContent = def;
+    tip.classList.add("show");
+    var r = el.getBoundingClientRect();
+    tip.style.left = "0px"; tip.style.top = "0px";
+    var tw = tip.offsetWidth, th = tip.offsetHeight;
+    var left = Math.min(Math.max(8, r.left), window.innerWidth - tw - 8);
+    var below = r.bottom + 10 + th < window.innerHeight;
+    var top = below ? r.bottom + 8 : r.top - th - 8;
+    tip.classList.toggle("below", below);
+    tip.classList.toggle("above", !below);
+    tip.style.setProperty("--ax", Math.max(8, Math.min(r.left - left + r.width / 2 - 4, tw - 16)) + "px");
+    tip.style.left = left + "px";
+    tip.style.top = top + "px";
+    el.classList.add("open");
+    openTerm = el;
+  }
+  function hideTip() {
+    tip.classList.remove("show");
+    if (openTerm) openTerm.classList.remove("open");
+    openTerm = null;
+  }
+
+  document.querySelectorAll(".term").forEach(function (el) {
+    el.addEventListener("mouseenter", function () { showTip(el); });
+    el.addEventListener("mouseleave", hideTip);
+    el.addEventListener("focus", function () { showTip(el); });
+    el.addEventListener("blur", hideTip);
+    el.addEventListener("click", function (e) { e.stopPropagation(); (openTerm === el) ? hideTip() : showTip(el); });
+    el.addEventListener("keydown", function (e) { if (e.key === "Escape") { hideTip(); el.blur(); } });
+  });
+  document.addEventListener("click", function () { if (openTerm) hideTip(); });
+  window.addEventListener("scroll", function () { if (openTerm && !openTerm.matches(":hover")) hideTip(); }, { passive: true });
+
+  /* ---------- 4. STAGE SPOTLIGHT (by colour class) ---------- */
+  var STAGES = [
+    { color: "green", label: "Extract" },
+    { color: "blue",  label: "Transform" },
+    { color: "dark",  label: "Store" },
+    { color: "coral", label: "Resilience" },
+    { color: "tan",   label: "Orchestration" }
+  ];
+  var COLOR_LABEL = {}; STAGES.forEach(function (s) { COLOR_LABEL[s.color] = s.label; });
+  var dimSelector = ".fbox, .detail-card, .info-card, .prop-card, .phase, .conductor-bar";
+  var chipSelector = ".dc-agent, .pill";
+  var spotBtn = document.getElementById("btn-spot");
+  var currentColor = null;
+
+  function colorOf(el) {
+    var cls = ["green", "blue", "dark", "coral", "tan"];
+    for (var i = 0; i < cls.length; i++) if (el.classList.contains(cls[i])) return cls[i];
+    return null;
+  }
+
+  function clearSpot() {
+    document.body.classList.remove("spot");
+    document.querySelectorAll(".spot-hit").forEach(function (e) { e.classList.remove("spot-hit"); });
+    document.querySelectorAll(".spotdim").forEach(function (e) { e.classList.remove("spotdim"); });
+    document.querySelectorAll(".color-legend .ci.on").forEach(function (e) { e.classList.remove("on"); });
+    currentColor = null;
+    spotBtn.classList.remove("on");
+    spotBtn.querySelector(".lbl").textContent = "Spotlight: off";
+  }
+
+  function spotlight(color) {
+    if (!color) return;
+    if (currentColor === color) { clearSpot(); return; }
+    clearSpot();
+    currentColor = color;
+    document.body.classList.add("spot");
+    document.querySelectorAll(dimSelector).forEach(function (e) {
+      if (colorOf(e) === color) { e.classList.add("spot-hit"); }
+      else { e.classList.add("spotdim"); }
+    });
+    document.querySelectorAll(chipSelector).forEach(function (chip) {
+      if (colorOf(chip) === color) chip.classList.add("spot-hit");
+    });
+    // sync legend
+    document.querySelectorAll(".color-legend .ci").forEach(function (ci) {
+      ci.classList.toggle("on", ci.getAttribute("data-color") === color);
+    });
+    spotBtn.classList.add("on");
+    spotBtn.querySelector(".lbl").textContent = "Spotlight: " + (COLOR_LABEL[color] || color);
+  }
+
+  // tag legend items + make colour chips clickable
+  var legendItems = document.querySelectorAll(".color-legend .ci");
+  legendItems.forEach(function (ci, i) {
+    if (i < STAGES.length) {
+      ci.setAttribute("data-color", STAGES[i].color);
+      ci.addEventListener("click", function (e) { e.stopPropagation(); spotlight(STAGES[i].color); });
+    }
+  });
+  document.querySelectorAll(chipSelector).forEach(function (chip) {
+    var c = colorOf(chip);
+    if (c) { chip.classList.add("clickable-agent"); chip.addEventListener("click", function (e) { e.stopPropagation(); spotlight(c); }); }
+  });
+  spotBtn.addEventListener("click", function (e) {
+    e.stopPropagation();
+    if (currentColor) { clearSpot(); return; }
+    spotlight("green");
+  });
+
+  /* ---------- 5. FLOW BOX -> jump to matching detail card ---------- */
+  var stepToCard = {};
+  document.querySelectorAll(".detail-card .dc-step").forEach(function (s) {
+    stepToCard[s.textContent.trim().toLowerCase()] = s.closest(".detail-card");
+  });
+  document.querySelectorAll(".flow-h .fbox, .hub-band .fbox").forEach(function (box) {
+    box.addEventListener("click", function () {
+      var step = (box.querySelector(".fstep") || {}).textContent;
+      if (!step) return;
+      var card = stepToCard[step.trim().toLowerCase()];
+      if (card) {
+        card.scrollIntoView({ behavior: "smooth", block: "center" });
+        card.classList.remove("pulse"); void card.offsetWidth; card.classList.add("pulse");
+      }
+    });
+  });
+
+  /* ---------- 6. THEME TOGGLE ---------- */
+  var themeBtn = document.getElementById("btn-theme");
+  function applyTheme(dark) {
+    document.body.classList.toggle("dark", dark);
+    themeBtn.classList.toggle("on", dark);
+    themeBtn.querySelector(".lbl").textContent = dark ? "Light" : "Dark";
+    try { localStorage.setItem("jap-theme", dark ? "dark" : "light"); } catch (x) {}
+  }
+  themeBtn.addEventListener("click", function (e) { e.stopPropagation(); applyTheme(!document.body.classList.contains("dark")); });
+  try { if (localStorage.getItem("jap-theme") === "dark") applyTheme(true); } catch (x) {}
+
+  /* ---------- 7. READING PROGRESS ---------- */
+  var bar = document.getElementById("progress");
+  function onScroll() {
+    var h = document.documentElement.scrollHeight - window.innerHeight;
+    bar.style.width = (h > 0 ? (window.scrollY / h) * 100 : 0) + "%";
+  }
+  window.addEventListener("scroll", onScroll, { passive: true });
+  window.addEventListener("resize", onScroll); onScroll();
+
+  /* ---------- 8. FIRST-VISIT HINT ---------- */
+  var hint = document.getElementById("hint");
+  function flash(html, ms) {
+    hint.innerHTML = html; hint.classList.add("show");
+    clearTimeout(flash._t); flash._t = setTimeout(function () { hint.classList.remove("show"); }, ms || 4200);
+  }
+  setTimeout(function () {
+    flash('Tip: hover the <b>dotted</b> terms for definitions &middot; click any <b>stage</b> chip or legend colour to spotlight it', 6000);
+  }, 900);
+
+})();
+</script>
+</body>
+</html>
